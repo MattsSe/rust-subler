@@ -14,5 +14,3 @@ database/Cargo.lock
 Cargo.lock
 
 bin/
-images/
-/atomicparsley/src/main.rs
