@@ -139,7 +139,7 @@ impl Subler {
             Some(ref s) => {
                 let p = Path::new(s.as_str());
                 if p.exists() {
-                    self.next_path(s.as_str(), 0)
+                    self.next_path(s.as_str(), 0).to_str().unwrap().to_owned()
                 } else {
                     s.clone()
                 }
