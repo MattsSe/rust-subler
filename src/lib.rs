@@ -52,7 +52,8 @@ impl Subler {
         }
     }
 
-    pub fn cli_executeable(&self) -> String {
+    /// returns the path to the sublercli executeable
+    pub fn cli_executeable() -> String {
         env::var("SUBLER_CLI_PATH").unwrap_or(format!("/usr/local/bin/SublerCli"))
     }
 
@@ -91,7 +92,7 @@ impl Subler {
             args.push("-optimize");
         }
 
-        let mut cmd = Command::new(self.cli_executeable().as_str());
+        let mut cmd = Command::new(Subler::cli_executeable().as_str());
         cmd.args(&args);
         Ok(cmd)
     }
