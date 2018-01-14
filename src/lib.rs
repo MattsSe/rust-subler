@@ -1,6 +1,6 @@
 use std::env;
 use std::path::Path;
-use std::process::{Command, Output, Child};
+use std::process::{Child, Command, Output};
 use std::io;
 
 #[derive(Debug, Clone)]
@@ -42,22 +42,22 @@ pub struct Subler {
 }
 
 impl Subler {
-    pub fn new(source: &str, atoms: Atoms, media_kind: Option<MediaKind>, optimize: bool) -> Self {
+    pub fn new(source: &str, atoms: Atoms) -> Self {
         Subler {
             source: source.to_owned(),
             dest: None,
-            optimize,
+            optimize: true,
             atoms,
-            media_kind,
+            media_kind: Some(MediaKind::Movie)
         }
     }
 
     pub fn cli_executeable(&self) -> String {
-        env::var("sublercli").unwrap_or(format!("/usr/local/bin/SublerCli"))
+        env::var("SUBLER_CLI_PATH").unwrap_or(format!("/usr/local/bin/SublerCli"))
     }
 
     /// Executes the tagging command as a child process, returning a handle to it.
-    pub fn spawn_tag(&mut self) -> io::Result<Child>{
+    pub fn spawn_tag(&mut self) -> io::Result<Child> {
         let mut cmd = self.build_tag_command()?;
         cmd.spawn()
     }
@@ -66,11 +66,15 @@ impl Subler {
     fn build_tag_command(&mut self) -> io::Result<Command> {
         let path = Path::new(self.source.as_str());
         if !path.exists() {
-            return Err(io::Error::new(io::ErrorKind::NotFound, format!("Source file does not exist.")));
+            return Err(io::Error::new(
+                io::ErrorKind::NotFound,
+                format!("Source file does not exist."),
+            ));
         }
 
         if self.media_kind.is_some() {
-            self.atoms.add_atom(self.media_kind.as_ref().unwrap().as_atom());
+            self.atoms
+                .add_atom(self.media_kind.as_ref().unwrap().as_atom());
         }
         let mut atoms = self.atoms.args();
 
@@ -99,14 +103,13 @@ impl Subler {
         cmd.output()
     }
 
-
     pub fn optimize(&mut self, val: bool) -> &mut Self {
         self.optimize = val;
         self
     }
 
-    pub fn media_kind(&mut self, kind: MediaKind) -> &mut Self {
-        self.media_kind = Some(kind);
+    pub fn media_kind(&mut self, kind: Option<MediaKind>) -> &mut Self {
+        self.media_kind = kind;
         self
     }
 
@@ -134,9 +137,6 @@ impl Atom {
     }
 }
 
-
-
-
 macro_rules! atom_tag {
 
     ( $($ident:tt : $tag:expr),*) => {
@@ -148,7 +148,7 @@ macro_rules! atom_tag {
         impl Atoms {
 
             /// all valid Metadata Atom tags
-            pub fn metadata_params<'a>() -> Vec<&'a str> {
+            pub fn metadata_tags<'a>() -> Vec<&'a str> {
                 let mut params = Vec::new();
                 $(
                     params.push($tag);
