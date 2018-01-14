@@ -1,6 +1,6 @@
 use std::env;
 use std::path::Path;
-use std::process::{Command, Output};
+use std::process::{Command, Output, Child};
 use std::io;
 
 #[derive(Debug, Clone)]
@@ -56,10 +56,14 @@ impl Subler {
         env::var("sublercli").unwrap_or(format!("/usr/local/bin/SublerCli"))
     }
 
-    ///
-    /// Apply the specified metadata to the source file and output it to
-    /// the specified destination file
-    pub fn tag(&mut self) -> io::Result<Output> {
+    /// Executes the tagging command as a child process, returning a handle to it.
+    pub fn spawn_tag(&mut self) -> io::Result<Child>{
+        let mut cmd = self.build_tag_command()?;
+        cmd.spawn()
+    }
+
+    /// create the subler process command
+    fn build_tag_command(&mut self) -> io::Result<Command> {
         let path = Path::new(self.source.as_str());
         if !path.exists() {
             return Err(io::Error::new(io::ErrorKind::NotFound, format!("Source file does not exist.")));
@@ -71,8 +75,7 @@ impl Subler {
         let mut atoms = self.atoms.args();
 
         let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
-        let sublercli = self.cli_executeable();
-        let mut args = vec![sublercli.as_str(), "-source", self.source.as_str()];
+        let mut args = vec!["-source", self.source.as_str()];
         args.push("-dest");
         if self.dest.is_some() {
             args.push(self.dest.as_ref().unwrap().as_str());
@@ -84,9 +87,16 @@ impl Subler {
             args.push("-optimize");
         }
 
-        Command::new(self.cli_executeable().as_str())
-            .args(&args)
-            .output()
+        let mut cmd = Command::new(self.cli_executeable().as_str());
+        cmd.args(&args);
+        Ok(cmd)
+    }
+
+    /// Apply the specified metadata to the source file and output it to
+    /// the specified destination file
+    pub fn tag(&mut self) -> io::Result<Output> {
+        let mut cmd = self.build_tag_command()?;
+        cmd.output()
     }
 
 
@@ -159,7 +169,7 @@ macro_rules! atom_tag {
                 let mut args = Vec::new();
                 if !self.inner.is_empty(){
                     args.push(format!("-metadata"));
-                    args.push(format!("\"{}\"",self.inner.iter().map(|x|x.arg()).collect::<Vec<_>>().join("")));
+                    args.push(self.inner.iter().map(|x|x.arg()).collect::<Vec<_>>().join(""));
                 }
                 args
             }
@@ -172,6 +182,10 @@ macro_rules! atom_tag {
             pub fn add(&mut self, tag: &str, val: &str) -> &mut Self {
                 self.inner.push(Atom::new(tag, val));
                 self
+            }
+
+            pub fn atoms(&self) -> &Vec<Atom> {
+                &self.inner
             }
 
         }
