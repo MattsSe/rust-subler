@@ -1,5 +1,5 @@
 use std::env;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output};
 use std::io;
 
@@ -48,7 +48,7 @@ impl Subler {
             dest: None,
             optimize: true,
             atoms,
-            media_kind: Some(MediaKind::Movie)
+            media_kind: Some(MediaKind::Movie),
         }
     }
 
@@ -73,6 +73,8 @@ impl Subler {
             ));
         }
 
+        let dest = self.determine_dest();
+
         if self.media_kind.is_some() {
             self.atoms
                 .add_atom(self.media_kind.as_ref().unwrap().as_atom());
@@ -82,9 +84,7 @@ impl Subler {
         let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
         let mut args = vec!["-source", self.source.as_str()];
         args.push("-dest");
-        if self.dest.is_some() {
-            args.push(self.dest.as_ref().unwrap().as_str());
-        }
+        args.push(dest.as_str());
 
         args.extend(meta_tags);
 
@@ -117,6 +117,28 @@ impl Subler {
     pub fn dest(&mut self, dest: &str) -> &mut Self {
         self.dest = Some(dest.to_owned());
         self
+    }
+
+    /// find the next available path
+    fn next_path(&self, p: &str, i: i32) -> PathBuf {
+        let path = Path::new(p);
+        let parent = path.parent().unwrap().to_str().unwrap();
+        let stem = path.file_stem().unwrap().to_str().unwrap();
+        let extension = path.extension().unwrap().to_str().unwrap();
+        let dest = format!("{}/{}.{}.{}", parent, stem, i, extension);
+        let new_path = Path::new(dest.as_str());
+        if new_path.exists() {
+            self.next_path(p, i + 1)
+        } else {
+            new_path.to_owned()
+        }
+    }
+
+    pub fn determine_dest(&self) -> String {
+        match self.dest {
+            Some(ref s) => s.clone(),
+            _ => self.next_path(self.source.as_str(), 0).to_str().unwrap().to_owned()
+        }
     }
 }
 
