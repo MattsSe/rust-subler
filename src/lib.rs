@@ -136,7 +136,14 @@ impl Subler {
 
     pub fn determine_dest(&self) -> String {
         match self.dest {
-            Some(ref s) => s.clone(),
+            Some(ref s) => {
+                let p = Path::new(s.as_str());
+                if p.exists() {
+                    self.next_path(s.as_str(), 0)
+                } else {
+                    s.clone()
+                }
+            }
             _ => self.next_path(self.source.as_str(), 0).to_str().unwrap().to_owned()
         }
     }
