@@ -14,3 +14,4 @@ database/Cargo.lock
 Cargo.lock
 
 bin/
+.idea/

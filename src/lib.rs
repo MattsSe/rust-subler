@@ -1,6 +1,7 @@
 use std::env;
 use std::path::Path;
-use std::process::Command;
+use std::process::{Command, Output};
+use std::io;
 
 #[derive(Debug, Clone)]
 pub enum MediaKind {
@@ -41,39 +42,39 @@ pub struct Subler {
 }
 
 impl Subler {
-    pub fn new(source: &str, atoms: Atoms) -> Self {
+    pub fn new(source: &str, atoms: Atoms, media_kind: Option<MediaKind>, optimize: bool) -> Self {
         Subler {
             source: source.to_owned(),
             dest: None,
-            optimize: false,
+            optimize,
             atoms,
-            media_kind: None,
+            media_kind,
         }
     }
 
     pub fn cli_executeable(&self) -> String {
-        env::var("sublercli").unwrap_or(format!("/usr/local/bin/sublercli"))
+        env::var("sublercli").unwrap_or(format!("/usr/local/bin/SublerCli"))
     }
 
     ///
     /// Apply the specified metadata to the source file and output it to
     /// the specified destination file
-    pub fn tag(&self) -> Result<(), ()> {
+    pub fn tag(&mut self) -> io::Result<Output> {
         let path = Path::new(self.source.as_str());
         if !path.exists() {
-            return Err(());
+            return Err(io::Error::new(io::ErrorKind::NotFound, format!("Source file does not exist.")));
+        }
+
+        if self.media_kind.is_some() {
+            self.atoms.add_atom(self.media_kind.as_ref().unwrap().as_atom());
         }
         let mut atoms = self.atoms.args();
 
-        if self.media_kind.is_some() {
-            atoms.push(self.media_kind.as_ref().unwrap().as_atom().arg());
-        }
-
         let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
-
-        let mut args = vec!["-source", self.source.as_str()];
+        let sublercli = self.cli_executeable();
+        let mut args = vec![sublercli.as_str(), "-source", self.source.as_str()];
+        args.push("-dest");
         if self.dest.is_some() {
-            args.push("-dest");
             args.push(self.dest.as_ref().unwrap().as_str());
         }
 
@@ -83,12 +84,9 @@ impl Subler {
             args.push("-optimize");
         }
 
-
         Command::new(self.cli_executeable().as_str())
-            .args(&args);
-
-
-        Ok(())
+            .args(&args)
+            .output()
     }
 
 
@@ -126,11 +124,14 @@ impl Atom {
     }
 }
 
+
+
+
 macro_rules! atom_tag {
 
     ( $($ident:tt : $tag:expr),*) => {
         #[derive(Debug, Clone)]
-        pub struct Atoms{
+        pub struct Atoms {
             inner: Vec<Atom>,
         }
 
@@ -147,8 +148,9 @@ macro_rules! atom_tag {
             }
 
             $(
-                pub fn $ident(&mut self, val: &str){
+                pub fn $ident(&mut self, val: &str) -> &mut Self{
                     self.inner.push(Atom::new($tag, val));
+                    self
                 }
             )*
 
@@ -157,25 +159,27 @@ macro_rules! atom_tag {
                 let mut args = Vec::new();
                 if !self.inner.is_empty(){
                     args.push(format!("-metadata"));
-                    args.push(self.inner.iter().map(|x|x.arg()).collect::<Vec<_>>().join(""));
+                    args.push(format!("\"{}\"",self.inner.iter().map(|x|x.arg()).collect::<Vec<_>>().join("")));
                 }
                 args
             }
 
-            pub fn add_atom(&mut self, atom: Atom) {
-                self.inner.push(atom)
+            pub fn add_atom(&mut self, atom: Atom) -> &mut Self {
+                self.inner.push(atom);
+                self
             }
 
-            pub fn add(&mut self, tag: &str, val: &str) {
-                self.inner.push(Atom::new(tag, val))
+            pub fn add(&mut self, tag: &str, val: &str) -> &mut Self {
+                self.inner.push(Atom::new(tag, val));
+                self
             }
+
         }
 
         impl Default for Atoms {
             fn default() -> Atoms {
                 Atoms{ inner : Vec::new() }
             }
-
         }
     };
 }

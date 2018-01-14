@@ -3,4 +3,3 @@ name = "rust-subler"
 version = "0.1.0"
 
 [dependencies]
-dotenv = "0.10.1"
