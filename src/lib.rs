@@ -300,6 +300,7 @@ atom_tag!(
     sort_tv_show: "Sort TV Show",
     artwork: "Artwork",
     name: "Name",
+    title: "Name",
     rating: "Rating",
     media_kind: "Media Kind"
    );
