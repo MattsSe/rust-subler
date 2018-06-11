@@ -1,8 +1,9 @@
+#![allow(unused_mut)]
+
 use std::env;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output};
 use std::io;
-
 #[derive(Debug, Clone)]
 pub enum MediaKind {
     Movie,
@@ -64,7 +65,7 @@ impl Subler {
     }
 
     /// create the subler process command
-    fn build_tag_command(&mut self) -> io::Result<Command> {
+    pub fn build_tag_command(&mut self) -> io::Result<Command> {
         let path = Path::new(self.source.as_str());
         if !path.exists() {
             return Err(io::Error::new(
@@ -79,6 +80,7 @@ impl Subler {
             self.atoms
                 .add_atom(self.media_kind.as_ref().unwrap().as_atom());
         }
+
         let mut atoms = self.atoms.args();
 
         let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
