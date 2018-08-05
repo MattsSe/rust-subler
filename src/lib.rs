@@ -47,14 +47,17 @@
 //! let subler = Subler::new(file, Atoms::new().title("Foo Bar Title").build())
 //!     // by default, mediakind is already set to `Movie`
 //!     .media_kind(Some(MediaKind::Movie))
+//!
 //!     // set an optional destination path
 //!     .dest("dest/path")
+//!
 //!     // by default the optimization flag is set to true
 //!     .optimize(false)
-//!     .media_kind(Some(MediaKind::Music))
+//!
 //!     // execute prcess in sync,
 //!     // alternativly spawn the process: `.spawn_tag()`
 //!     .tag()
+//!
 //!     .and_then(|x| {
 //!         println!("stdout: {}", String::from_utf8_lossy(&x.stdout));
 //!         Ok(())

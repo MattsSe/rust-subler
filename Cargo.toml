@@ -3,7 +3,7 @@ authors = ["Matthias Seitz <matthias.seitz@tum.de>"]
 name = "sublercli"
 version = "0.1.1"
 license = "MIT OR Apache-2.0"
-documentation = "https://docs.rs/sublercli-rs"
+documentation = "https://docs.rs/sublercli"
 repository = "https://github.com/MattsSe/sublercli-rs"
 readme = "README.md"
 categories = ["command-line-utilities","api-bindings"]
@@ -15,4 +15,4 @@ Commandline Interface for the SublerCLI Tool. Only mac OS.
 [dependencies]
 
 [badges]
-travis-ci = { repository = "MattsSe/sublercli-rs" }
+travis-ci = { repository = "MattsSe/rust-subler" }
