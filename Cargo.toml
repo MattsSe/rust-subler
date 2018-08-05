@@ -1,5 +1,18 @@
 [package]
-name = "rust-subler"
+authors = ["Matthias Seitz <matthias.seitz@tum.de>"]
+name = "sublercli"
 version = "0.1.1"
+license = "MIT OR Apache-2.0"
+documentation = "https://docs.rs/sublercli-rs"
+repository = "https://github.com/MattsSe/sublercli-rs"
+readme = "README.md"
+categories = ["command-line-utilities","api-bindings"]
+keywords = ["media", "video", "mac OS"]
+description = """
+Commandline Interface for the SublerCLI Tool. Only mac OS.
+"""
 
 [dependencies]
+
+[badges]
+travis-ci = { repository = "MattsSe/sublercli-rs" }
