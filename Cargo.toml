@@ -7,7 +7,7 @@ documentation = "https://docs.rs/sublercli"
 repository = "https://github.com/MattsSe/sublercli-rs"
 readme = "README.md"
 categories = ["command-line-utilities","api-bindings"]
-keywords = ["media", "video", "mac OS"]
+keywords = ["media", "video", "macos"]
 description = """
 Commandline Interface for the SublerCLI Tool. Only mac OS.
 """
