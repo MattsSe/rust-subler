@@ -1,9 +1,72 @@
-#![allow(unused_mut)]
+//! sublercli-rs - a simple commandline interface for the sublerCLI tool on mac OS
+//! to write metadata to media files
+//!
+//! ## Installation
+//!
+//! Requires an additional [SublerCLI](https://bitbucket.org/galad87/sublercli) Installation.
+//! To install with homebrew: `brew cask install sublercli`
+//!
+//! By default `sublercli-rs` assumes a `homebrew` installation under /usr/local/bin/SublerCli`
+//! You can check your installtion path with `brew cask info sublercli`
+//! If the SublerCLI installation destination deviates from default, you can overwerite the path
+//! by setting the `SUBLER_CLI_PATH` environment variable to the valid destination.
+//!
+//! ## Atoms
+//!
+//! To store metadata, Atoms are used. An Atom has a specifc name and the value it stores.
+//! The `Atom` struct mimics this behavior. There is a predefined set of valid atoms.
+//! To obtain a list of al valid metadata atom tag names:
+//!
+//! ```rust,no_run
+//! use sublercli::Atoms;
+//! let valid_tags: Vec<&str> = Atoms::metadata_tags();
+//! ```
+//! Support for the predefined set of known atoms is individually implemented.
+//! `Atoms` functions as a wrapper to store a set of single `Atom` values and is used
+//! to create Atoms like:
+//!
+//! ```rust,no_run
+//! use sublercli::*;
+//! let atoms = Atoms::new()
+//!     .add("Cast", "John Doe")
+//!     .genre("Foo,Bar")
+//!     .artist("Foo Artist")
+//!     .title("Foo Bar Title")
+//!     .release_date("2018")
+//!     .build();
+//! ```
+//!
+//! ## Tagging
+//!
+//! To invoke the SublerCLI process:
+//! If no dest path is supplied then the destination path is the existing file name
+//! suffixed, starting from 0: `demo.mp4 -> demo.0.mp4`
+//! ```rust,no_run
+//! use sublercli::*;   
+//! let file = "demo.mp4";
+//! let subler = Subler::new(file, Atoms::new().title("Foo Bar Title").build())
+//!     // by default, mediakind is already set to `Movie`
+//!     .media_kind(Some(MediaKind::Movie))
+//!     // set an optional destination path
+//!     .dest("dest/path")
+//!     // by default the optimization flag is set to true
+//!     .optimize(false)
+//!     .media_kind(Some(MediaKind::Music))
+//!     // execute prcess in sync,
+//!     // alternativly spawn the process: `.spawn_tag()`
+//!     .tag()
+//!     .and_then(|x| {
+//!         println!("stdout: {}", String::from_utf8_lossy(&x.stdout));
+//!         Ok(())
+//!     });
+//! ```
 
-use std::env;
+#![deny(warnings)]
+use std::io;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Output};
-use std::io;
+
+/// Represents the type of media for a input file
 #[derive(Debug, Clone)]
 pub enum MediaKind {
     Movie,
@@ -17,7 +80,7 @@ pub enum MediaKind {
 
 impl MediaKind {
     pub fn as_str(&self) -> &str {
-        match *self {
+        match self {
             MediaKind::Movie => "Movie",
             MediaKind::Music => "Music",
             MediaKind::Audiobook => "Audiobook",
@@ -28,6 +91,7 @@ impl MediaKind {
         }
     }
 
+    /// Creates a new `Media Kind`
     pub fn as_atom(&self) -> Atom {
         Atom::new("Media Kind", self.as_str())
     }
@@ -35,14 +99,23 @@ impl MediaKind {
 
 #[derive(Debug)]
 pub struct Subler {
+    /// The path to the source file
     pub source: String,
+    /// The path to the destination file
     pub dest: Option<String>,
+    /// The Subler optimization flag
     pub optimize: bool,
+    /// The atoms that should be written to the file
     pub atoms: Atoms,
+    /// The Mediakind of the file
     pub media_kind: Option<MediaKind>,
 }
 
 impl Subler {
+    /// creates a new SublerCli Interface with a set of Atoms that
+    /// should be set to the the file at the `source`
+    /// By default MediaKind is set to `MediaKind::Movie` and
+    /// optimization level is set to true
     pub fn new(source: &str, atoms: Atoms) -> Self {
         Subler {
             source: source.to_owned(),
@@ -54,8 +127,10 @@ impl Subler {
     }
 
     /// returns the path to the sublercli executeable
+    /// Assumes a homebrew installtion by default under `/usr/local/bin/SublerCli`,
+    /// can be overwritten setting the `SUBLER_CLI_PATH` env variable
     pub fn cli_executeable() -> String {
-        env::var("SUBLER_CLI_PATH").unwrap_or(format!("/usr/local/bin/SublerCli"))
+        ::std::env::var("SUBLER_CLI_PATH").unwrap_or_else(|_| "/usr/local/bin/SublerCli".to_owned())
     }
 
     /// Executes the tagging command as a child process, returning a handle to it.
@@ -70,24 +145,21 @@ impl Subler {
         if !path.exists() {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                format!("Source file does not exist."),
+                "Source file does not exist.".to_owned(),
             ));
         }
-
-        let dest = self.determine_dest();
-
-        if self.media_kind.is_some() {
-            self.atoms
-                .add_atom(self.media_kind.as_ref().unwrap().as_atom());
+        if let Some(ref media_kind) = self.media_kind {
+            self.atoms.add_atom(media_kind.as_atom());
         }
 
-        let mut atoms = self.atoms.args();
-
-        let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
+        let dest = self
+            .determine_dest()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Dest Not Found!"))?;
+        let atoms = self.atoms.args();
         let mut args = vec!["-source", self.source.as_str()];
         args.push("-dest");
         args.push(dest.as_str());
-
+        let meta_tags: Vec<&str> = atoms.iter().map(AsRef::as_ref).collect();
         args.extend(meta_tags);
 
         if self.optimize {
@@ -106,6 +178,7 @@ impl Subler {
         cmd.output()
     }
 
+    /// sets the optimization flag
     pub fn optimize(&mut self, val: bool) -> &mut Self {
         self.optimize = val;
         self
@@ -116,44 +189,58 @@ impl Subler {
         self
     }
 
+    /// sets the destination of the output file
     pub fn dest(&mut self, dest: &str) -> &mut Self {
         self.dest = Some(dest.to_owned());
         self
     }
 
-    /// find the next available path
-    fn next_path(&self, p: &str, i: i32) -> PathBuf {
+    /// computes the next available path by appending
+    fn next_available_path(&self, p: &str, i: i32) -> Option<PathBuf> {
         let path = Path::new(p);
-        let parent = path.parent().unwrap().to_str().unwrap();
-        let stem = path.file_stem().unwrap().to_str().unwrap();
-        let extension = path.extension().unwrap().to_str().unwrap();
+        let parent = path.parent()?.to_str()?;
+        let stem = path.file_stem()?.to_str()?;
+        let extension = path.extension()?.to_str()?;
         let dest = format!("{}/{}.{}.{}", parent, stem, i, extension);
         let new_path = Path::new(dest.as_str());
         if new_path.exists() {
-            self.next_path(p, i + 1)
+            self.next_available_path(p, i + 1)
         } else {
-            new_path.to_owned()
+            Some(new_path.to_owned())
         }
     }
 
-    pub fn determine_dest(&self) -> String {
+    /// finds the next valid destination path, if no dest path is supplied
+    /// then the destination path is the existing file name suffixed, starting from 0
+    fn determine_dest(&self) -> Option<String> {
         match self.dest {
             Some(ref s) => {
                 let p = Path::new(s.as_str());
                 if p.exists() {
-                    self.next_path(s.as_str(), 0).to_str().unwrap().to_owned()
+                    Some(
+                        self.next_available_path(s.as_str(), 0)?
+                            .to_str()?
+                            .to_owned(),
+                    )
                 } else {
-                    s.clone()
+                    Some(s.clone())
                 }
             }
-            _ => self.next_path(self.source.as_str(), 0).to_str().unwrap().to_owned()
+            _ => Some(
+                self.next_available_path(self.source.as_str(), 0)?
+                    .to_str()?
+                    .to_owned(),
+            ),
         }
     }
 }
 
+/// Represents a Metadata Media Atom
 #[derive(Debug, Clone)]
 pub struct Atom {
+    /// The Name of the Metadata Atom
     pub tag: String,
+    /// The Value this atom contains
     pub value: String,
 }
 
@@ -174,10 +261,15 @@ macro_rules! atom_tag {
     ( $($ident:tt : $tag:expr),*) => {
         #[derive(Debug, Clone)]
         pub struct Atoms {
+            /// The stored atoms
             inner: Vec<Atom>,
         }
 
         impl Atoms {
+
+            pub fn new() -> Builder {
+                Builder::default()
+            }
 
             /// all valid Metadata Atom tags
             pub fn metadata_tags<'a>() -> Vec<&'a str> {
@@ -200,8 +292,8 @@ macro_rules! atom_tag {
             pub fn args(&self) -> Vec<String> {
                 let mut args = Vec::new();
                 if !self.inner.is_empty(){
-                    args.push(format!("-metadata"));
-                    args.push(self.inner.iter().map(|x|x.arg()).collect::<Vec<_>>().join(""));
+                    args.push("-metadata".to_owned());
+                    args.push(self.inner.iter().map(Atom::arg).collect::<Vec<_>>().join(""));
                 }
                 args
             }
@@ -220,11 +312,43 @@ macro_rules! atom_tag {
                 &self.inner
             }
 
+            pub fn atoms_mut(&mut self) -> &mut Vec<Atom> {
+                &mut self.inner
+            }
         }
 
-        impl Default for Atoms {
-            fn default() -> Atoms {
-                Atoms{ inner : Vec::new() }
+        #[derive(Debug)]
+        pub struct Builder {
+            pub atoms: Vec<Atom>,
+        }
+
+        impl Builder {
+
+             $(
+                pub fn $ident(&mut self, val: &str) -> &mut Self{
+                    self.atoms.push(Atom::new($tag, val));
+                    self
+                }
+            )*
+
+            pub fn add_atom(&mut self, atom: Atom) -> &mut Self {
+                self.atoms.push(atom);
+                self
+            }
+
+            pub fn add(&mut self, tag: &str, val: &str) -> &mut Self {
+                self.atoms.push(Atom::new(tag, val));
+                self
+            }
+
+            pub fn build(&self) -> Atoms {
+                Atoms {inner: self.atoms.clone()}
+            }
+        }
+
+        impl Default for Builder {
+            fn default() -> Self {
+                Builder { atoms: Vec::new() }
             }
         }
     };
